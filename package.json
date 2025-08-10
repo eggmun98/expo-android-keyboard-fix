@@ -1,29 +1,29 @@
 {
     "name": "expo-android-keyboard-fix",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Fix for KeyboardAvoidingView on Android 15 (SDK 35) in Expo/React Native apps",
     "main": "index.js",
     "peerDependencies": {
         "expo": "*"
-      },
+    },
     "repository": {
-      "type": "git",
-      "url": "https://github.com/eggmun98/expo-android-keyboard-fix.git"
+        "type": "git",
+        "url": "https://github.com/eggmun98/expo-android-keyboard-fix.git"
     },
     "keywords": [
-      "expo",
-      "react-native",
-      "android",
-      "keyboard",
-      "keyboardavoidingview",
-      "sdk35",
-      "android15",
-      "expo-config-plugin"
+        "expo",
+        "react-native",
+        "android",
+        "keyboard",
+        "keyboardavoidingview",
+        "sdk35",
+        "android15",
+        "expo-config-plugin"
     ],
     "author": "eggmun98",
     "license": "MIT",
     "bugs": {
-      "url": "https://github.com/eggmun98/expo-android-keyboard-fix/issues"
+        "url": "https://github.com/eggmun98/expo-android-keyboard-fix/issues"
     },
     "homepage": "https://github.com/eggmun98/expo-android-keyboard-fix#readme"
-  }
+}

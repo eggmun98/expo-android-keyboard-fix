@@ -2,12 +2,40 @@ const { withMainActivity } = require('@expo/config-plugins');
 
 module.exports = function withAndroidKeyboardFix(config) {
   return withMainActivity(config, (config) => {
-    let mainActivity = config.modResults.contents;
+    let contents = config.modResults.contents;
 
-    if (!mainActivity.includes('WindowInsetsCompat.Type.ime()')) {
-      const isKotlin = mainActivity.includes('class MainActivity : ReactActivity');
+    if (contents.includes('WindowInsetsCompat.Type.ime()')) {
+      return config;
+    }
 
-      const replacementCodeKotlin = `
+    const isKotlin = contents.includes('class MainActivity : ReactActivity');
+    if (!isKotlin) {
+      return config;
+    }
+
+    const importsToAdd = [
+      'android.os.Build',
+      'android.os.Bundle',
+      'android.view.View',
+      'androidx.core.view.ViewCompat',
+      'androidx.core.view.WindowInsetsCompat',
+    ];
+
+    const addMissingImports = (src, imports) => {
+      const lines = src.split('\n');
+      const existing = new Set(
+        lines
+          .filter((l) => l.trim().startsWith('import '))
+          .map((l) => l.trim().replace('import ', '').replace(';', '')),
+      );
+      const missing = imports.filter((imp) => !existing.has(imp));
+      if (missing.length === 0) return src;
+
+      const block = missing.map((imp) => `import ${imp}`).join('\n');
+      return src.replace(/(package [^\n;]+[;\n])/, `$1\n${block}\n`);
+    };
+
+    const replacementCodeKotlin = `
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
 
@@ -24,78 +52,24 @@ module.exports = function withAndroidKeyboardFix(config) {
         insets
       }
     }
-  }`;
+  }`.trim();
 
-      const replacementCodeJava = `
-  @Override
-  protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
+    contents = addMissingImports(contents, importsToAdd);
 
-    if (Build.VERSION.SDK_INT >= 35) {
-      View rootView = findViewById(android.R.id.content);
-      ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-        WindowInsetsCompat.Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
-        rootView.setPadding(
-          imeInsets.left,
-          imeInsets.top,
-          imeInsets.right,
-          imeInsets.bottom
-        );
-        return insets;
-      });
-    }
-  }`;
+    const onCreateRegex =
+      /override\s+fun\s+onCreate\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\}/;
 
-      const importsToAddKotlin = [
-        'android.os.Build',
-        'android.view.View',
-        'androidx.core.view.ViewCompat',
-        'androidx.core.view.WindowInsetsCompat',
-      ];
-
-      const importsToAddJava = [
-        'android.os.Build;',
-        'android.view.View;',
-        'androidx.core.view.ViewCompat;',
-        'androidx.core.view.WindowInsetsCompat;',
-      ];
-
-      const addMissingImports = (contents, imports, isKotlin) => {
-        const lines = contents.split('\n');
-        const existingImports = new Set(
-          lines
-            .filter((line) => line.trim().startsWith('import '))
-            .map((line) => line.trim().replace('import ', '').replace(';', '')),
-        );
-
-        const missingImports = imports.filter((importStmt) => !existingImports.has(importStmt.replace(';', '')));
-
-        if (missingImports.length === 0) {
-          return contents;
-        }
-
-        const importBlock = missingImports.map((stmt) => `import ${stmt}${isKotlin ? '' : ';'}`).join('\n');
-
-        return contents.replace(/(package [^\n;]+[;\n])/, `$1\n${importBlock}\n`);
-      };
-
-      if (isKotlin) {
-        mainActivity = addMissingImports(mainActivity, importsToAddKotlin, true);
-        mainActivity = mainActivity.replace(
-          /override fun onCreate\([^)]*\)[^{]*{[\s\S]*?super\.onCreate\([^)]*\)\s*}/,
-          replacementCodeKotlin,
-        );
-      } else {
-        mainActivity = addMissingImports(mainActivity, importsToAddJava, false);
-        mainActivity = mainActivity.replace(
-          /public class MainActivity extends ReactActivity \{/,
-          `public class MainActivity extends ReactActivity {${replacementCodeJava}`,
-        );
-      }
-
-      config.modResults.contents = mainActivity;
+    if (onCreateRegex.test(contents)) {
+      contents = contents.replace(onCreateRegex, replacementCodeKotlin);
+    } else {
+      contents = contents.replace(
+        /(class\s+MainActivity\s*:\s*ReactActivity[^{]*\{)([\s\S]*?)(\n\})/,
+        (_m, start, body, endBrace) =>
+          `${start}${body}\n\n  ${replacementCodeKotlin.split('\n').join('\n  ')}${endBrace}`,
+      );
     }
 
+    config.modResults.contents = contents;
     return config;
   });
 };
